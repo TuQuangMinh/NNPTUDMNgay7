@@ -2,6 +2,7 @@ var express = require('express');
 var router = express.Router();
 let slugify = require('slugify');
 let productModel = require('../schemas/products')
+let inventoryModel = require('../schemas/inventory')
 
 /* GET users listing. */
 router.get('/', async function (req, res, next) {
@@ -71,21 +72,37 @@ router.get('/:id', async function (req, res, next) {
 // });
 //CREATE UPDATE DELETE
 router.post('/', async function (req, res) {
-    let newProduct = new productModel({
-        title: req.body.title,
-        slug: slugify(req.body.title, {
-            replacement: '-',
-            remove: undefined,
-            lower: true,
-            strict: true
-        }),
-        price: req.body.price,
-        description: req.body.description,
-        category: req.body.category,
-        images: req.body.images
-    })
-    await newProduct.save()
-    res.send(newProduct)
+    try {
+        let newProduct = new productModel({
+            title: req.body.title,
+            slug: slugify(req.body.title, {
+                replacement: '-',
+                remove: undefined,
+                lower: true,
+                strict: true
+            }),
+            price: req.body.price,
+            description: req.body.description,
+            category: req.body.category,
+            images: req.body.images
+        })
+        await newProduct.save()
+
+        // ensure an inventory record exists for the new product
+        try {
+            let inventory = new inventoryModel({
+                product: newProduct._id
+            })
+            await inventory.save()
+        } catch (inventoryError) {
+            // If inventory creation fails, log it but still return the created product.
+            console.warn('Failed to create inventory for product', inventoryError.message)
+        }
+
+        res.send(newProduct)
+    } catch (error) {
+        res.status(400).send({ message: error.message })
+    }
 })
 router.put('/:id', async function (req, res) {
 
